@@ -386,3 +386,75 @@ class TestRobustness:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+# =============================================================================
+# 8. GENERALIZACAO PARA RAIO ARBITRARIO r
+# =============================================================================
+
+from voronoi_frontier.core import compute_frontier_r
+
+class TestFrontierR:
+    """
+    Verifica a generalizacao para raio r arbitrario.
+
+    Principio testado: compute_frontier_r(a, b, c, r) deve produzir
+    exatamente os mesmos pontos que compute_frontier(a/r, b/r, c/r)
+    escalados por r. Isso valida o principio de invariancia por escala.
+    """
+
+    def test_r1_identico_a_compute_frontier(self, default_params):
+        """Para r=1, compute_frontier_r deve ser identico a compute_frontier."""
+        a, b, c = default_params["a"], default_params["b"], default_params["c"]
+        xs1, ys1, _, _ = compute_frontier(a, b, c, n_points=50)
+        xs2, ys2, _, _ = compute_frontier_r(a, b, c, r=1.0, n_points=50)
+        np.testing.assert_allclose(xs1, xs2, rtol=1e-10)
+        np.testing.assert_allclose(ys1, ys2, rtol=1e-10)
+
+    def test_escala_por_r(self, default_params):
+        """
+        compute_frontier_r(a, b, c, r) deve ser igual a
+        compute_frontier(a/r, b/r, c/r) * r.
+        """
+        a, b, c = default_params["a"], default_params["b"], default_params["c"]
+        r = 2.0
+        # Resultado de referencia: compute_frontier(a,b,c) escalado por r
+        # Pois compute_frontier_r(a*r, b*r, c*r, r) divide internamente por r,
+        # recuperando exatamente (a, b, c) -> resultado = compute_frontier(a,b,c) * r
+        xs_n, ys_n, _, _ = compute_frontier(a, b, c, n_points=50)
+        xs_esperado = xs_n * r
+        ys_esperado = ys_n * r
+        # Resultado da funcao generalizada
+        xs_r, ys_r, _, _ = compute_frontier_r(a*r, b*r, c*r, r=r, n_points=50)
+        np.testing.assert_allclose(xs_r, xs_esperado, rtol=1e-8)
+        np.testing.assert_allclose(ys_r, ys_esperado, rtol=1e-8)
+
+    def test_pontos_auxiliares_escalados(self, default_params):
+        """Os pontos auxiliares Q2 e D devem ser escalados por r."""
+        a, b, c = default_params["a"], default_params["b"], default_params["c"]
+        r = 3.0
+        _, _, kp1, _ = compute_frontier(a, b, c, n_points=10)
+        _, _, kp_r, _ = compute_frontier_r(a*r, b*r, c*r, r=r, n_points=10)
+        for nome in ("Q2", "Q5", "D"):
+            np.testing.assert_allclose(
+                kp_r[nome], kp1[nome] * r, rtol=1e-8,
+                err_msg=f"Ponto {nome} nao foi escalado corretamente"
+            )
+
+    def test_r_negativo_lanca_excecao(self, default_params):
+        """r negativo deve lancar ValueError."""
+        a, b, c = default_params["a"], default_params["b"], default_params["c"]
+        with pytest.raises(ValueError, match="r deve ser positivo"):
+            compute_frontier_r(a, b, c, r=-1.0)
+
+    def test_multiplos_valores_de_r(self):
+        """O algoritmo deve funcionar para varios valores de r."""
+        configs = [
+            (4.0, -6.0, 1.0,  2.0),
+            (6.0, -9.0, 1.5,  3.0),
+            (1.0, -1.5, 0.25, 0.5),
+        ]
+        for a, b, c, r in configs:
+            xs, ys, _, _ = compute_frontier_r(a, b, c, r=r, n_points=50)
+            assert len(xs) > 0, f"Nenhum ponto gerado para r={r}"
+

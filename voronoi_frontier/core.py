@@ -736,3 +736,93 @@ def compute_frontier(a: float, b: float, c: float,
     }
 
     return np.array(xs), np.array(ys), key_points, info
+
+
+# =============================================================================
+# GENERALIZACAO PARA RAIO ARBITRARIO r
+# =============================================================================
+
+def compute_frontier_r(a: float, b: float, c: float, r: float,
+                       n_points: int = 200,
+                       max_iter: int = 50,
+                       tol: float = 1e-10
+                       ) -> Tuple[np.ndarray, np.ndarray, dict, dict]:
+    """
+    Calcula a fronteira de Voronoi para um obstaculo circular de raio r arbitrario.
+
+    Esta funcao generaliza compute_frontier (que assume r=1) usando o principio
+    de invariancia por escala: um circulo de raio r centrado em (c, 0) e
+    equivalente ao circulo unitario apos escalar todas as coordenadas por 1/r.
+
+    Procedimento:
+        1. Escalar os parametros: a -> a/r, b -> b/r, c -> c/r
+        2. Chamar compute_frontier com o problema normalizado (r=1)
+        3. Reescalar os resultados multiplicando por r
+
+    Restricoes dos parametros:
+        a > 0
+        b < 0
+        -b > a
+        0 < c < r    (centro do obstaculo dentro do intervalo)
+        a^2 + c^2 >= r^2  (A fora do circulo)
+        b^2 + c^2 >= r^2  (B fora do circulo)
+
+    Parametros
+    ----------
+    a, b, c : float -- mesmos parametros de compute_frontier.
+    r       : float -- raio do obstaculo circular (deve ser positivo).
+    n_points, max_iter, tol : mesmos parametros de compute_frontier.
+
+    Retorna
+    -------
+    xs, ys     : np.ndarray -- coordenadas dos pontos da fronteira (escala original).
+    key_points : dict       -- pontos auxiliares Q1, Q2, Q5, Q6, D (escala original).
+    info       : dict       -- informacoes diagnosticas (igual a compute_frontier).
+
+    Exemplo
+    -------
+    >>> xs, ys, kp, info = compute_frontier_r(a=4.0, b=-6.0, c=1.0, r=2.0)
+    >>> # Equivalente a compute_frontier(a=2.0, b=-3.0, c=0.5) escalado por 2
+    """
+    if r <= 0:
+        raise ValueError(f"r deve ser positivo. Recebido: r = {r}")
+
+    # Validacao das restricoes no espaco original
+    if a <= 0:
+        raise ValueError(f"a deve ser positivo. Recebido: a = {a}")
+    if b >= 0:
+        raise ValueError(f"b deve ser negativo. Recebido: b = {b}")
+    if -b <= a:
+        raise ValueError(f"-b deve ser maior que a. Recebido: a = {a}, b = {b}")
+    if not (0 < c < r):
+        raise ValueError(f"c deve satisfazer 0 < c < r = {r}. Recebido: c = {c}")
+    if a**2 + c**2 < r**2:
+        raise ValueError(
+            f"O ponto A = (0, {a}) esta dentro do circulo de raio {r}. "
+            f"Necessario: a^2 + c^2 >= r^2."
+        )
+    if b**2 + c**2 < r**2:
+        raise ValueError(
+            f"O ponto B = (0, {b}) esta dentro do circulo de raio {r}. "
+            f"Necessario: b^2 + c^2 >= r^2."
+        )
+
+    # Escalar para o problema unitario (r=1)
+    a_n = a / r
+    b_n = b / r
+    c_n = c / r
+
+    # Resolver no espaco normalizado
+    xs_n, ys_n, kp_n, info = compute_frontier(
+        a_n, b_n, c_n,
+        n_points=n_points,
+        max_iter=max_iter,
+        tol=tol
+    )
+
+    # Reescalar os resultados para o espaco original
+    xs = xs_n * r
+    ys = ys_n * r
+    key_points = {nome: ponto * r for nome, ponto in kp_n.items()}
+
+    return xs, ys, key_points, info
