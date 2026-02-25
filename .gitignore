@@ -1,0 +1,19 @@
+﻿# Arquivos compilados Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Cache do pytest
+.pytest_cache/
+
+# Ambientes virtuais
+venv/
+env/
+
+# Configuracoes de editores
+.vscode/
+.idea/
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db
